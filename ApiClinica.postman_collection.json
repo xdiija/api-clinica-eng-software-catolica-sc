@@ -1,0 +1,2598 @@
+{
+  "info": {
+    "name": "ApiClinica",
+    "description": "Collection da API de Clínica (.NET 10 + EF Core + SQLite).\n\nBase: http://localhost:5070/api — HTTP, não HTTPS.\nSuba o ambiente com `docker compose up -d` e confira em `0. Saúde`.\n\nIMPORTANTE — rode as pastas na ordem, de 0 a 7, com o banco vazio. A collection é encadeada: os POSTs guardam os ids gerados em variáveis ({{pacienteId}}, {{medicoId}}, {{consultaId}}…) e as pastas seguintes dependem desses registros. Em particular, a pasta 3 deixa de pé a consulta A (paciente 1 + médico 1 às 10:00 de 15/12/2026), que é o alvo dos testes de conflito da pasta 6.\n\nPastas 1 a 3: caminho feliz. Pastas 4 a 6: validações, todas esperando 400. Pasta 7: a regra de que não se remove paciente nem médico com consulta futura.\n\nAlguns casos da pasta 6 disparam mais de uma regra ao mesmo tempo (por exemplo, conflito de médico e de paciente na mesma requisição). O esperado continua sendo 400; a mensagem da resposta diz quais regras foram violadas.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5070/api"
+    },
+    {
+      "key": "hostUrl",
+      "value": "http://localhost:5070"
+    },
+    {
+      "key": "pacienteId",
+      "value": ""
+    },
+    {
+      "key": "pacienteId2",
+      "value": ""
+    },
+    {
+      "key": "pacienteIdTemp",
+      "value": ""
+    },
+    {
+      "key": "medicoId",
+      "value": ""
+    },
+    {
+      "key": "medicoId2",
+      "value": ""
+    },
+    {
+      "key": "medicoIdTemp",
+      "value": ""
+    },
+    {
+      "key": "consultaId",
+      "value": ""
+    },
+    {
+      "key": "consultaIdTemp",
+      "value": ""
+    },
+    {
+      "key": "consultaIdC",
+      "value": ""
+    },
+    {
+      "key": "consultaIdD",
+      "value": ""
+    },
+    {
+      "key": "pacienteIdDel",
+      "value": ""
+    },
+    {
+      "key": "medicoIdDel",
+      "value": ""
+    },
+    {
+      "key": "consultaIdDel",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Saúde",
+      "description": "Liveness. Confirme aqui que a API subiu antes de rodar o resto.",
+      "item": [
+        {
+          "name": "GET /alive",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{hostUrl}}/alive",
+              "host": [
+                "{{hostUrl}}"
+              ],
+              "path": [
+                "alive"
+              ]
+            },
+            "description": "Fora do prefixo /api, de propósito: não é recurso do domínio."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Pacientes",
+      "description": "CRUD completo. Deixa de pé os pacientes 1 e 2.",
+      "item": [
+        {
+          "name": "POST criar paciente 1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Maria Souza\",\n  \"email\": \"maria@exemplo.com\",\n  \"telefone\": \"(47) 98888-7777\",\n  \"dataNasc\": \"1990-05-12\",\n  \"cpf\": \"123.456.789-09\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Guarda o id em {{pacienteId}}. Espera 201 + header Location."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('pacienteId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST criar paciente 2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"João Pereira\",\n  \"email\": \"joao@exemplo.com\",\n  \"telefone\": \"(11) 97777-6655\",\n  \"dataNasc\": \"1985-03-20\",\n  \"cpf\": \"529.982.247-25\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Guarda o id em {{pacienteId2}}. Usado nos conflitos de horário."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('pacienteId2', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET listar pacientes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes"
+              ]
+            },
+            "description": "Retorna apenas DTOs de leitura, com CPF mascarado e idade derivada."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET paciente por id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes/{{pacienteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes",
+                "{{pacienteId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET paciente inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes",
+                "999999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH nome e telefone",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes/{{pacienteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes",
+                "{{pacienteId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Maria Souza Andrade\",\n  \"telefone\": \"(47) 98888-1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Campos ausentes não devem mudar."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH com nulls explícitos",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes/{{pacienteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes",
+                "{{pacienteId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": null,\n  \"email\": null,\n  \"telefone\": null,\n  \"dataNasc\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "null significa 'não atualizar': nada muda e a resposta é 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST paciente descartável",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Ana Teste\",\n  \"email\": \"ana.teste@exemplo.com\",\n  \"telefone\": \"(47) 98000-1000\",\n  \"dataNasc\": \"2000-01-15\",\n  \"cpf\": \"111.444.777-35\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Criado só para provar o DELETE sem apagar os pacientes 1 e 2."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('pacienteIdTemp', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE paciente descartável",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes/{{pacienteIdTemp}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes",
+                "{{pacienteIdTemp}}"
+              ]
+            },
+            "description": "Sem consultas futuras: deve ser removido."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Médicos",
+      "description": "CRUD completo. Deixa de pé os médicos 1 e 2.",
+      "item": [
+        {
+          "name": "POST criar médico 1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/medicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Dr. Carlos Lima\",\n  \"email\": \"carlos@clinica.com\",\n  \"telefone\": \"(47) 3344-5566\",\n  \"crm\": \"12345/SC\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Guarda o id em {{medicoId}}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('medicoId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST criar médico 2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/medicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Dra. Ana Rocha\",\n  \"email\": \"ana@clinica.com\",\n  \"telefone\": \"(47) 98111-2233\",\n  \"crm\": \"54321/SC\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Guarda o id em {{medicoId2}}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('medicoId2', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET listar médicos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/medicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicos"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET médico por id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/medicos/{{medicoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicos",
+                "{{medicoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET médico inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/medicos/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicos",
+                "999999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH atualizar médico",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/medicos/{{medicoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicos",
+                "{{medicoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"telefone\": \"(47) 3344-0000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST médico descartável",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/medicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Dr. Teste\",\n  \"email\": \"teste@clinica.com\",\n  \"telefone\": \"(47) 3000-2000\",\n  \"crm\": \"11111/SC\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('medicoIdTemp', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE médico descartável",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/medicos/{{medicoIdTemp}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicos",
+                "{{medicoIdTemp}}"
+              ]
+            },
+            "description": "Sem consultas futuras: deve ser removido."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Consultas",
+      "description": "CRUD completo. Duração fixa de 30 minutos.\n\nA consulta A (paciente 1 + médico 1, 15/12/2026 10:00) fica de pé ao final: é contra ela que a pasta 6 testa os conflitos. O DELETE é provado com uma consulta descartável, em outro dia.",
+      "item": [
+        {
+          "name": "POST criar consulta A",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/consultas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pacienteId\": {{pacienteId}},\n  \"medicoId\": {{medicoId}},\n  \"dataHora\": \"2026-12-15T10:00:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Paciente 1 + médico 1 às 10:00. Guarda o id em {{consultaId}}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('consultaId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET listar consultas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/consultas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas"
+              ]
+            },
+            "description": "O DTO traz dataHora e dataHoraFim (início + 30 min)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET consulta por id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/consultas/{{consultaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas",
+                "{{consultaId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET consulta inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/consultas/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas",
+                "999999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST consulta descartável",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/consultas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pacienteId\": {{pacienteId2}},\n  \"medicoId\": {{medicoId2}},\n  \"dataHora\": \"2026-12-16T09:00:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Paciente 2 + médico 2 em outro dia, para não atrapalhar a pasta 6."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('consultaIdTemp', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH remarcar consulta descartável",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/consultas/{{consultaIdTemp}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas",
+                "{{consultaIdTemp}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dataHora\": \"2026-12-16T09:30:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Horário livre: deve funcionar."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE consulta descartável",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/consultas/{{consultaIdTemp}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas",
+                "{{consultaIdTemp}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Validações — Paciente",
+      "description": "Todas esperam 400.",
+      "item": [
+        {
+          "name": "POST email inválido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Maria Souza\",\n  \"email\": \"nao-e-um-email\",\n  \"telefone\": \"(47) 98888-7777\",\n  \"dataNasc\": \"1990-05-12\",\n  \"cpf\": \"987.654.321-00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST telefone sem máscara",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Maria Souza\",\n  \"email\": \"maria@exemplo.com\",\n  \"telefone\": \"47988887777\",\n  \"dataNasc\": \"1990-05-12\",\n  \"cpf\": \"987.654.321-00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Formato exigido: (47) 98888-7777."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST telefone com formato errado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Maria Souza\",\n  \"email\": \"maria@exemplo.com\",\n  \"telefone\": \"(47) 9888-77777\",\n  \"dataNasc\": \"1990-05-12\",\n  \"cpf\": \"987.654.321-00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST data de nascimento no futuro",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Maria Souza\",\n  \"email\": \"maria@exemplo.com\",\n  \"telefone\": \"(47) 98888-7777\",\n  \"dataNasc\": \"2030-01-01\",\n  \"cpf\": \"987.654.321-00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST CPF com dígito verificador errado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Maria Souza\",\n  \"email\": \"maria@exemplo.com\",\n  \"telefone\": \"(47) 98888-7777\",\n  \"dataNasc\": \"1990-05-12\",\n  \"cpf\": \"123.456.789-00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST CPF com dígitos repetidos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Maria Souza\",\n  \"email\": \"maria@exemplo.com\",\n  \"telefone\": \"(47) 98888-7777\",\n  \"dataNasc\": \"1990-05-12\",\n  \"cpf\": \"111.111.111-11\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST CPF duplicado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Outra Pessoa\",\n  \"email\": \"outra@exemplo.com\",\n  \"telefone\": \"(47) 98888-7777\",\n  \"dataNasc\": \"1990-05-12\",\n  \"cpf\": \"123.456.789-09\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "O paciente 1 já usou este CPF."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST CPF sem máscara já cadastrado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Sem Mascara\",\n  \"email\": \"sm@exemplo.com\",\n  \"telefone\": \"(47) 98888-7777\",\n  \"dataNasc\": \"1990-05-12\",\n  \"cpf\": \"12345678909\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Prova a normalização: mesmo CPF, escrito de outro jeito."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH tentando alterar o CPF",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes/{{pacienteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes",
+                "{{pacienteId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cpf\": \"987.654.321-00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "O CPF não pode ser alterado no PATCH."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH email inválido",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes/{{pacienteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes",
+                "{{pacienteId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"invalido@\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH data de nascimento no futuro",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes/{{pacienteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes",
+                "{{pacienteId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dataNasc\": \"2031-07-07\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Validações — Médico",
+      "description": "Todas esperam 400.",
+      "item": [
+        {
+          "name": "POST email inválido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/medicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Dr. Carlos Lima\",\n  \"email\": \"carlos@@clinica\",\n  \"telefone\": \"(47) 3344-5566\",\n  \"crm\": \"12345/SC\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST telefone inválido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/medicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Dr. Carlos Lima\",\n  \"email\": \"carlos@clinica.com\",\n  \"telefone\": \"4733445566\",\n  \"crm\": \"12345/SC\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH email inválido",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/medicos/{{medicoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicos",
+                "{{medicoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"sem-arroba.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH telefone inválido",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/medicos/{{medicoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicos",
+                "{{medicoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"telefone\": \"(47) 3344-55\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Validações — Consulta",
+      "description": "Rode depois das pastas 1 a 3. Os dois primeiros itens montam o cenário; os demais esperam 400.\n\nCenário: consulta A = paciente 1 + médico 1 às 10:00 (vem da pasta 3); consulta C = paciente 2 + médico 2 às 10:00 (mesmo horário, sem ator em comum, por isso é válida); consulta D = paciente 1 + médico 2 às 14:00 (compartilha o paciente com A).",
+      "item": [
+        {
+          "name": "Cenário: consulta C (mesmo horário, outros atores)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/consultas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pacienteId\": {{pacienteId2}},\n  \"medicoId\": {{medicoId2}},\n  \"dataHora\": \"2026-12-15T10:00:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Válida: não divide paciente nem médico com a consulta A."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('consultaIdC', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cenário: consulta D (mesmo paciente de A, mais tarde)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/consultas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pacienteId\": {{pacienteId}},\n  \"medicoId\": {{medicoId2}},\n  \"dataHora\": \"2026-12-15T14:00:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Válida: 14:00 não conflita com nada."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('consultaIdD', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST paciente inexistente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/consultas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pacienteId\": 999999,\n  \"medicoId\": {{medicoId}},\n  \"dataHora\": \"2026-12-17T16:00:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST médico inexistente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/consultas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pacienteId\": {{pacienteId}},\n  \"medicoId\": 999999,\n  \"dataHora\": \"2026-12-17T16:00:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST horário no passado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/consultas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pacienteId\": {{pacienteId}},\n  \"medicoId\": {{medicoId}},\n  \"dataHora\": \"2025-01-10T09:00:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST mesmo horário para o mesmo médico",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/consultas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pacienteId\": {{pacienteId2}},\n  \"medicoId\": {{medicoId}},\n  \"dataHora\": \"2026-12-15T10:00:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Médico 1 já tem a consulta A neste horário exato."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST mesmo horário para o mesmo paciente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/consultas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pacienteId\": {{pacienteId}},\n  \"medicoId\": {{medicoId2}},\n  \"dataHora\": \"2026-12-15T10:00:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Paciente 1 já tem a consulta A neste horário exato."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST sobreposição de horário (médico)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/consultas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pacienteId\": {{pacienteId2}},\n  \"medicoId\": {{medicoId}},\n  \"dataHora\": \"2026-12-15T10:15:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "A ocupa 10:00-10:30; esta seria 10:15-10:45."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST sobreposição de horário (paciente)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/consultas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pacienteId\": {{pacienteId}},\n  \"medicoId\": {{medicoId2}},\n  \"dataHora\": \"2026-12-15T10:15:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH movendo D para horário sobreposto",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/consultas/{{consultaIdD}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas",
+                "{{consultaIdD}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dataHora\": \"2026-12-15T10:15:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "D é do paciente 1, que já tem A às 10:00."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH trocando o médico de C para um ocupado",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/consultas/{{consultaIdC}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas",
+                "{{consultaIdC}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"medicoId\": {{medicoId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "C é às 10:00; o médico 1 já tem A nesse horário. Trocar o médico obriga a revalidar a sobreposição."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH trocando o paciente de C para um ocupado",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/consultas/{{consultaIdC}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas",
+                "{{consultaIdC}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pacienteId\": {{pacienteId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Mesma ideia, pelo lado do paciente."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH movendo C para o passado",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/consultas/{{consultaIdC}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas",
+                "{{consultaIdC}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dataHora\": \"2025-01-10T09:00:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Regras de DELETE",
+      "description": "Não se remove paciente nem médico com consulta no futuro.\n\nUsa registros próprios, para não depender do estado das pastas anteriores: cria paciente + médico + consulta futura, prova os dois bloqueios, remove a consulta e então os DELETEs passam.",
+      "item": [
+        {
+          "name": "Preparo: criar paciente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Paciente Bloqueio\",\n  \"email\": \"bloqueio@exemplo.com\",\n  \"telefone\": \"(47) 98555-4444\",\n  \"dataNasc\": \"1979-11-02\",\n  \"cpf\": \"316.721.143-14\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('pacienteIdDel', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Preparo: criar médico",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/medicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Dr. Bloqueio\",\n  \"email\": \"bloqueio@clinica.com\",\n  \"telefone\": \"(47) 3000-1111\",\n  \"crm\": \"99999/SC\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('medicoIdDel', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Preparo: criar consulta futura",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/consultas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pacienteId\": {{pacienteIdDel}},\n  \"medicoId\": {{medicoIdDel}},\n  \"dataHora\": \"2026-12-20T08:00:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('consultaIdDel', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE paciente com consulta futura",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes/{{pacienteIdDel}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes",
+                "{{pacienteIdDel}}"
+              ]
+            },
+            "description": "Deve ser recusado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE médico com consulta futura",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/medicos/{{medicoIdDel}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicos",
+                "{{medicoIdDel}}"
+              ]
+            },
+            "description": "Deve ser recusado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Remover a consulta",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/consultas/{{consultaIdDel}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas",
+                "{{consultaIdDel}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE paciente agora liberado",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes/{{pacienteIdDel}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes",
+                "{{pacienteIdDel}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE médico agora liberado",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/medicos/{{medicoIdDel}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicos",
+                "{{medicoIdDel}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

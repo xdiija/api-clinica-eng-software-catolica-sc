@@ -1,0 +1,44 @@
+@ApiClinica_HostAddress = http://localhost:5070
+
+### Liveness
+GET {{ApiClinica_HostAddress}}/alive
+Accept: application/json
+
+### Listar pacientes
+GET {{ApiClinica_HostAddress}}/api/pacientes
+Accept: application/json
+
+### Criar paciente
+POST {{ApiClinica_HostAddress}}/api/pacientes
+Content-Type: application/json
+
+{
+  "nome": "Maria Souza",
+  "email": "maria@exemplo.com",
+  "telefone": "(47) 98888-7777",
+  "dataNasc": "1990-05-12",
+  "cpf": "123.456.789-09"
+}
+
+### Criar médico
+POST {{ApiClinica_HostAddress}}/api/medicos
+Content-Type: application/json
+
+{
+  "nome": "Dr. Carlos Lima",
+  "email": "carlos@clinica.com",
+  "telefone": "(47) 3344-5566",
+  "crm": "12345/SC"
+}
+
+### Criar consulta
+POST {{ApiClinica_HostAddress}}/api/consultas
+Content-Type: application/json
+
+{
+  "pacienteId": 1,
+  "medicoId": 1,
+  "dataHora": "2026-12-15T10:00:00"
+}
+
+###

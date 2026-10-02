@@ -1,0 +1,26 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    ports:
+      - "5070:8080"
+    volumes:
+      - .:/src
+      - api-obj:/src/obj
+      - api-bin:/src/bin
+      - nuget:/home/app/.nuget/packages
+    stdin_open: true
+    tty: true
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/alive"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 90s
+
+volumes:
+  api-obj:
+  api-bin:
+  nuget:
