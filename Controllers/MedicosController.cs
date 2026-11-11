@@ -1,109 +1,83 @@
-using ApiClinica.Data;
 using ApiClinica.DTOs;
-using ApiClinica.Mappers;
+using ApiClinica.Interfaces;
+using ApiClinica.Models;
+using ApiClinica.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace ApiClinica.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize] // Todos os métodos exigem token JWT válido.
 public class MedicosController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly IMedicoService _service;
 
-    public MedicosController(AppDbContext context)
+    public MedicosController(IMedicoService service)
     {
-        _context = context;
+        _service = service;
     }
 
     // GET: api/medicos
     [HttpGet]
     public async Task<IActionResult> GetMedicos()
     {
-        var medicos = await _context.Medicos.ToListAsync();
-
-        var medicosDTO = medicos
-            .Select(medico => MedicoMapper.ToDTO(medico))
-            .ToList();
-
-        return Ok(medicosDTO);
+        return Ok(await _service.ListarAsync());
     }
 
     // GET: api/medicos/{id}
     [HttpGet("{id}")]
     public async Task<IActionResult> GetMedicoById(int id)
     {
-        var medico = await _context.Medicos.FindAsync(id);
+        var medico = await _service.BuscarPorIdAsync(id);
 
         if (medico is null) return NotFound();
 
-        return Ok(MedicoMapper.ToDTO(medico));
+        return Ok(medico);
     }
 
     // POST: api/medicos
     [HttpPost]
     public async Task<IActionResult> CreateMedico([FromBody] MedicoCreateDTO dto)
     {
-        var erros = new ErrosDeValidacao();
+        var resultado = await _service.CriarAsync(dto);
 
-        var medico = MedicoMapper.ToModel(dto, erros);
+        if (resultado.Status == StatusResultado.Invalido)
+            return ValidationProblem(resultado.Erros!.ParaModelState());
 
-        if (medico is null) return ValidationProblem(erros.ParaModelState());
+        var medico = resultado.Valor!;
 
-        _context.Medicos.Add(medico);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(
-            nameof(GetMedicoById),
-            new { id = medico.Id },
-            MedicoMapper.ToDTO(medico));
+        return CreatedAtAction(nameof(GetMedicoById), new { id = medico.Id }, medico);
     }
 
-    // PATCH: api/medicos/{id}
+    // PATCH: api/medicos/{id} — somente Admin
     [HttpPatch("{id}")]
+    [Authorize(Roles = Perfis.Admin)]
     public async Task<IActionResult> UpdateMedico(int id, [FromBody] MedicoUpdateDTO dto)
     {
-        var medico = await _context.Medicos.FindAsync(id);
+        var resultado = await _service.AtualizarAsync(id, dto);
 
-        if (medico is null) return NotFound();
-
-        var erros = new ErrosDeValidacao();
-
-        MedicoMapper.AplicarUpdate(dto, medico, erros);
-
-        if (erros.Algum) return ValidationProblem(erros.ParaModelState());
-
-        await _context.SaveChangesAsync();
-
-        return Ok(MedicoMapper.ToDTO(medico));
+        return resultado.Status switch
+        {
+            StatusResultado.NaoEncontrado => NotFound(),
+            StatusResultado.Invalido => ValidationProblem(resultado.Erros!.ParaModelState()),
+            _ => Ok(resultado.Valor)
+        };
     }
 
-    // DELETE: api/medicos/{id}
+    // DELETE: api/medicos/{id} — somente Admin
     [HttpDelete("{id}")]
+    [Authorize(Roles = Perfis.Admin)]
     public async Task<IActionResult> DeleteMedico(int id)
     {
-        var medico = await _context.Medicos.FindAsync(id);
+        var resultado = await _service.RemoverAsync(id);
 
-        if (medico is null) return NotFound();
-
-        var agora = DateTime.Now;
-
-        var consultas = await _context.Consultas
-            .Where(consulta => consulta.MedicoId == id)
-            .ToListAsync();
-
-        if (consultas.Any(consulta => consulta.DataHora.NoFuturo(agora)))
+        return resultado.Status switch
         {
-            var erros = new ErrosDeValidacao();
-            erros.Adicionar(
-                "id", "Não é possível remover um médico com consultas agendadas no futuro.");
-            return ValidationProblem(erros.ParaModelState());
-        }
-
-        _context.Medicos.Remove(medico);
-        await _context.SaveChangesAsync();
-
-        return NoContent();
+            StatusResultado.NaoEncontrado => NotFound(),
+            StatusResultado.Invalido => ValidationProblem(resultado.Erros!.ParaModelState()),
+            _ => NoContent()
+        };
     }
 }

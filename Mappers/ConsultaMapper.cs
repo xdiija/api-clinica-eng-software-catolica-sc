@@ -1,12 +1,13 @@
 using ApiClinica.DTOs;
+using ApiClinica.Interfaces;
 using ApiClinica.Models;
 using ApiClinica.Models.ValueObjects;
 
 namespace ApiClinica.Mappers;
 
-public static class ConsultaMapper
+public class ConsultaMapper : IConsultaMapper
 {
-    public static Consulta ToModel(ConsultaCreateDTO dto)
+    public Consulta ToModel(ConsultaCreateDTO dto)
     {
         return new Consulta
         {
@@ -16,14 +17,14 @@ public static class ConsultaMapper
         };
     }
 
-    public static void AplicarUpdate(ConsultaUpdateDTO dto, Consulta consulta)
+    public void AplicarUpdate(ConsultaUpdateDTO dto, Consulta consulta)
     {
         if (dto.PacienteId is not null) consulta.PacienteId = dto.PacienteId.Value;
         if (dto.MedicoId is not null) consulta.MedicoId = dto.MedicoId.Value;
         if (dto.DataHora is not null) consulta.DataHora = JanelaConsulta.De(dto.DataHora.Value);
     }
 
-    public static ConsultaReadDTO ToDTO(Consulta consulta)
+    public ConsultaReadDTO ToDTO(Consulta consulta)
     {
         return new ConsultaReadDTO
         {

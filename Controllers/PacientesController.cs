@@ -1,117 +1,84 @@
-using ApiClinica.Data;
 using ApiClinica.DTOs;
-using ApiClinica.Mappers;
+using ApiClinica.Interfaces;
+using ApiClinica.Models;
+using ApiClinica.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace ApiClinica.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize] // Todos os métodos exigem token JWT válido.
 public class PacientesController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly IPacienteService _service;
 
-    public PacientesController(AppDbContext context)
+    // O service chega por Injeção de Dependências (registrado no Program.cs).
+    public PacientesController(IPacienteService service)
     {
-        _context = context;
+        _service = service;
     }
-
-    private static DateOnly Hoje => DateOnly.FromDateTime(DateTime.Today);
 
     // GET: api/pacientes
     [HttpGet]
     public async Task<IActionResult> GetPacientes()
     {
-        var pacientes = await _context.Pacientes.ToListAsync();
-
-        var pacientesDTO = pacientes
-            .Select(paciente => PacienteMapper.ToDTO(paciente, Hoje))
-            .ToList();
-
-        return Ok(pacientesDTO);
+        return Ok(await _service.ListarAsync());
     }
 
     // GET: api/pacientes/{id}
     [HttpGet("{id}")]
     public async Task<IActionResult> GetPacienteById(int id)
     {
-        var paciente = await _context.Pacientes.FindAsync(id);
+        var paciente = await _service.BuscarPorIdAsync(id);
 
         if (paciente is null) return NotFound();
 
-        return Ok(PacienteMapper.ToDTO(paciente, Hoje));
+        return Ok(paciente);
     }
 
     // POST: api/pacientes
     [HttpPost]
     public async Task<IActionResult> CreatePaciente([FromBody] PacienteCreateDTO dto)
     {
-        var erros = new ErrosDeValidacao();
+        var resultado = await _service.CriarAsync(dto);
 
-        var paciente = PacienteMapper.ToModel(dto, Hoje, erros);
+        if (resultado.Status == StatusResultado.Invalido)
+            return ValidationProblem(resultado.Erros!.ParaModelState());
 
-        if (paciente is null) return ValidationProblem(erros.ParaModelState());
+        var paciente = resultado.Valor!;
 
-        if (await _context.Pacientes.AnyAsync(p => p.Cpf == paciente.Cpf))
-        {
-            erros.Adicionar("cpf", "Já existe um paciente cadastrado com este CPF.");
-            return ValidationProblem(erros.ParaModelState());
-        }
-
-        _context.Pacientes.Add(paciente);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(
-            nameof(GetPacienteById),
-            new { id = paciente.Id },
-            PacienteMapper.ToDTO(paciente, Hoje));
+        return CreatedAtAction(nameof(GetPacienteById), new { id = paciente.Id }, paciente);
     }
 
-    // PATCH: api/pacientes/{id}
+    // PATCH: api/pacientes/{id} — somente Admin
     [HttpPatch("{id}")]
+    [Authorize(Roles = Perfis.Admin)]
     public async Task<IActionResult> UpdatePaciente(int id, [FromBody] PacienteUpdateDTO dto)
     {
-        var paciente = await _context.Pacientes.FindAsync(id);
+        var resultado = await _service.AtualizarAsync(id, dto);
 
-        if (paciente is null) return NotFound();
-
-        var erros = new ErrosDeValidacao();
-
-        PacienteMapper.AplicarUpdate(dto, paciente, Hoje, erros);
-
-        if (erros.Algum) return ValidationProblem(erros.ParaModelState());
-
-        await _context.SaveChangesAsync();
-
-        return Ok(PacienteMapper.ToDTO(paciente, Hoje));
+        return resultado.Status switch
+        {
+            StatusResultado.NaoEncontrado => NotFound(),
+            StatusResultado.Invalido => ValidationProblem(resultado.Erros!.ParaModelState()),
+            _ => Ok(resultado.Valor)
+        };
     }
 
-    // DELETE: api/pacientes/{id}
+    // DELETE: api/pacientes/{id} — somente Admin
     [HttpDelete("{id}")]
+    [Authorize(Roles = Perfis.Admin)]
     public async Task<IActionResult> DeletePaciente(int id)
     {
-        var paciente = await _context.Pacientes.FindAsync(id);
+        var resultado = await _service.RemoverAsync(id);
 
-        if (paciente is null) return NotFound();
-
-        var agora = DateTime.Now;
-
-        var consultas = await _context.Consultas
-            .Where(consulta => consulta.PacienteId == id)
-            .ToListAsync();
-
-        if (consultas.Any(consulta => consulta.DataHora.NoFuturo(agora)))
+        return resultado.Status switch
         {
-            var erros = new ErrosDeValidacao();
-            erros.Adicionar(
-                "id", "Não é possível remover um paciente com consultas agendadas no futuro.");
-            return ValidationProblem(erros.ParaModelState());
-        }
-
-        _context.Pacientes.Remove(paciente);
-        await _context.SaveChangesAsync();
-
-        return NoContent();
+            StatusResultado.NaoEncontrado => NotFound(),
+            StatusResultado.Invalido => ValidationProblem(resultado.Erros!.ParaModelState()),
+            _ => NoContent()
+        };
     }
 }

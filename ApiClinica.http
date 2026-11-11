@@ -1,16 +1,52 @@
 @ApiClinica_HostAddress = http://localhost:5070
 
-### Liveness
+### Liveness (não precisa de token)
 GET {{ApiClinica_HostAddress}}/alive
 Accept: application/json
 
-### Listar pacientes
+### Login como Admin (criado automaticamente na subida da API)
+# @name loginAdmin
+POST {{ApiClinica_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@clinica.com",
+  "senha": "Admin@123"
+}
+
+### Registrar usuário comum
+POST {{ApiClinica_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "nome": "Usuário Comum",
+  "email": "comum@clinica.com",
+  "senha": "Comum@123"
+}
+
+### Login como usuário comum
+# @name loginComum
+POST {{ApiClinica_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "comum@clinica.com",
+  "senha": "Comum@123"
+}
+
+### Listar pacientes sem token (espera 401)
 GET {{ApiClinica_HostAddress}}/api/pacientes
 Accept: application/json
 
-### Criar paciente
+### Listar pacientes (Admin)
+GET {{ApiClinica_HostAddress}}/api/pacientes
+Accept: application/json
+Authorization: Bearer {{loginAdmin.response.body.$.token}}
+
+### Criar paciente (qualquer usuário logado)
 POST {{ApiClinica_HostAddress}}/api/pacientes
 Content-Type: application/json
+Authorization: Bearer {{loginComum.response.body.$.token}}
 
 {
   "nome": "Maria Souza",
@@ -23,6 +59,7 @@ Content-Type: application/json
 ### Criar médico
 POST {{ApiClinica_HostAddress}}/api/medicos
 Content-Type: application/json
+Authorization: Bearer {{loginAdmin.response.body.$.token}}
 
 {
   "nome": "Dr. Carlos Lima",
@@ -34,11 +71,30 @@ Content-Type: application/json
 ### Criar consulta
 POST {{ApiClinica_HostAddress}}/api/consultas
 Content-Type: application/json
+Authorization: Bearer {{loginAdmin.response.body.$.token}}
 
 {
   "pacienteId": 1,
   "medicoId": 1,
   "dataHora": "2026-12-15T10:00:00"
+}
+
+### PATCH como usuário comum (espera 403)
+PATCH {{ApiClinica_HostAddress}}/api/pacientes/1
+Content-Type: application/json
+Authorization: Bearer {{loginComum.response.body.$.token}}
+
+{
+  "nome": "Maria S."
+}
+
+### PATCH como Admin (espera 200)
+PATCH {{ApiClinica_HostAddress}}/api/pacientes/1
+Content-Type: application/json
+Authorization: Bearer {{loginAdmin.response.body.$.token}}
+
+{
+  "nome": "Maria S."
 }
 
 ###

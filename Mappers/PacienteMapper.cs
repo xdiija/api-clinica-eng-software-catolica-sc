@@ -1,11 +1,12 @@
 using ApiClinica.DTOs;
+using ApiClinica.Interfaces;
 using ApiClinica.Models;
 
 namespace ApiClinica.Mappers;
 
-public static class PacienteMapper
+public class PacienteMapper : IPacienteMapper
 {
-    public static Paciente? ToModel(
+    public Paciente? ToModel(
         PacienteCreateDTO dto, DateOnly hoje, ErrosDeValidacao erros)
     {
         var nome = ValidacaoDeCampos.LerNome(dto.Nome, erros);
@@ -26,7 +27,7 @@ public static class PacienteMapper
         };
     }
 
-    public static void AplicarUpdate(
+    public void AplicarUpdate(
         PacienteUpdateDTO dto, Paciente paciente, DateOnly hoje, ErrosDeValidacao erros)
     {
         if (dto.Cpf is not null)
@@ -49,7 +50,7 @@ public static class PacienteMapper
         if (dataNasc is not null) paciente.DataNasc = dataNasc.Value;
     }
 
-    public static PacienteReadDTO ToDTO(Paciente paciente, DateOnly hoje)
+    public PacienteReadDTO ToDTO(Paciente paciente, DateOnly hoje)
     {
         return new PacienteReadDTO
         {

@@ -14,6 +14,7 @@ public class AppDbContext : DbContext
     public DbSet<Paciente> Pacientes { get; set; }
     public DbSet<Medico> Medicos { get; set; }
     public DbSet<Consulta> Consultas { get; set; }
+    public DbSet<Usuario> Usuarios { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -69,5 +70,17 @@ public class AppDbContext : DbContext
 
         consulta.HasIndex(c => new { c.MedicoId, c.DataHora });
         consulta.HasIndex(c => new { c.PacienteId, c.DataHora });
+
+        var usuario = modelBuilder.Entity<Usuario>();
+
+        usuario.Property(u => u.Nome).HasMaxLength(120);
+
+        usuario.Property(u => u.Email)
+            .HasConversion(email => email.Valor, valor => Email.Reconstituir(valor))
+            .HasMaxLength(254);
+
+        usuario.HasIndex(u => u.Email).IsUnique();
+
+        usuario.Property(u => u.Perfil).HasMaxLength(20);
     }
 }

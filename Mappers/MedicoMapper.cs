@@ -1,11 +1,12 @@
 using ApiClinica.DTOs;
+using ApiClinica.Interfaces;
 using ApiClinica.Models;
 
 namespace ApiClinica.Mappers;
 
-public static class MedicoMapper
+public class MedicoMapper : IMedicoMapper
 {
-    public static Medico? ToModel(MedicoCreateDTO dto, ErrosDeValidacao erros)
+    public Medico? ToModel(MedicoCreateDTO dto, ErrosDeValidacao erros)
     {
         var nome = ValidacaoDeCampos.LerNome(dto.Nome, erros);
         var email = ValidacaoDeCampos.LerEmail(dto.Email, erros);
@@ -23,7 +24,7 @@ public static class MedicoMapper
         };
     }
 
-    public static void AplicarUpdate(MedicoUpdateDTO dto, Medico medico, ErrosDeValidacao erros)
+    public void AplicarUpdate(MedicoUpdateDTO dto, Medico medico, ErrosDeValidacao erros)
     {
         var nome = dto.Nome is null ? null : ValidacaoDeCampos.LerNome(dto.Nome, erros);
         var email = dto.Email is null ? null : ValidacaoDeCampos.LerEmail(dto.Email, erros);
@@ -40,7 +41,7 @@ public static class MedicoMapper
         if (crm is not null) medico.CRM = crm;
     }
 
-    public static MedicoReadDTO ToDTO(Medico medico)
+    public MedicoReadDTO ToDTO(Medico medico)
     {
         return new MedicoReadDTO
         {
